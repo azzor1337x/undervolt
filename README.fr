@@ -1,0 +1,65 @@
+README: undervolt
+
+Ce programme permet de manipuler le voltage et la fréquence des processeurs AMD Brazos/Ontario, de manière à essentiellement augmenter l'autonomie soit en réduisant le voltage utilisé par chaque mode processeur (undervolt), soit en réduisant la fréquence (underclock). Il s'adapte aux processeurs C-30, C-50, C-60, E-240, E-300, E-350, E450, sous Linux.
+
+COMPILATION
+
+Faire make dans le répertoire.
+$ make
+
+INSTALLATION
+
+Copier undervolt dans un répertoire bin ou sbin.
+$ sudo cp undervolt /usr/local/sbin
+
+UTILISATION
+
+S'assurer que le module msr est bien chargé:
+$ lsmod | grep msr
+msr                    12908  0 
+Si msr n'apparait pas, le charger avec la commande suivante:
+$ modprobe msr
+
+Vérifier que undervolt est capable de lire les états:
+$ sudo undervolt -c
+P-state		Vid		Voltage		div
+  0		0x19		1.2375V		2.00
+  1		0x1A		1.2250V		2.50
+  2		0x33		0.9125V		4.00
+
+Explication: le processeur, pour gérer au mieux performances et autonomie, va passer de P0 (le mode le plus performant et le plus gourmand) à P1 ou P2 (le mode le plus économique) en fonction de la charge du système. Le but d'undervolt est de réduire le voltage utilisé par chaque mode de manière à diminuer la température du système et sa consommation énergique.
+
+Pour chaque état processeur, un Vid (voltage id) est associé. Augmenter le Vid diminue le voltage. La technique consiste à augmenter le Vid pas à pas jusqu'à ce que l'ordinateur bloque, et de noter le Vid le plus important où l'ordinateur ne bloque pas. Nota: le Vid est donné en hexadécimal; ainsi augmenter un Vid de 0x19 de 1 donne un Vid de 0x1A; augmenter un Vid de 0x1F de 1 donne un Vid de 0x20. La température du processeur et le bruit de la ventilation devraient diminuer de manière significative.
+
+Undervolt permet de changer le Vid d'un mode:
+$ sudo undervolt -P 0:0x19
+(Passe le Vid du mode P0 à 0x19)
+Et vérifier que les changements ont bien été pris en compte:
+$ sudo undervolt -c
+CPU 0: current P-state: 0, current Vid: 0x19/1.2375V, current div: 2.00
+CPU 1: current P-state: 2, current Vid: 0x19/1.2375V, current div: 4.00
+Note: les changements sont pris en compte au prochain changement de mode, et les deux CPUs, s'ils sont sur des modes différents, choisissent le Vid le plus petit (dans le cas ci-dessus, le Vid du mode P0).
+
+Une fois les Vid déterminés pour tous les modes, il suffit de configurer Linux pour que ces changements soient appliqués au démarrage. Une solution est, par exemple, d'ajouter au fichier /etc/rc.local une ligne pour charger le module msr (modprobe msr) et une ligne pour changer les Vid (:
+
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+
+modprobe msr
+#Default undervolt at: 0:1,2375V 1:1,2250V 2:0,9125V
+/usr/local/sbin/undervolt -p 0:0x19 -p 1:0x1A -p 2:0x33
+exit 0
+
+En espérant que ce petit programme vous soit utile.
+
+Thierry, 12-2011.
